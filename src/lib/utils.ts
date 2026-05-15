@@ -47,23 +47,70 @@ export function exportToExcel(data: any[], filename: string, sheetName = 'الب
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
+// ─── Arabic Text Helper ─────────────────────────────────────────────────
+// Reverses Arabic text so jsPDF renders it correctly right-to-left
+function fixArabic(text: string): string {
+  if (!text || typeof text !== 'string') return text ?? ''
+  // Check if text contains Arabic characters
+  const hasArabic = /[\u0600-\u06FF]/.test(text)
+  if (!hasArabic) return text
+  // Reverse the string to fix RTL rendering in jsPDF
+  return text.split('').reverse().join('')
+}
+
+function fixArabicRow(row: any[]): any[] {
+  return row.map(cell => {
+    if (typeof cell === 'string') return fixArabic(cell)
+    return cell
+  })
+}
+
 // ─── Export to PDF ──────────────────────────────────────────────────────
 export function exportToPDF(title: string, headers: string[], rows: any[][], filename: string) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+
+  const pageWidth = doc.internal.pageSize.width
+
+  // Title (Arabic reversed for correct rendering)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.text(title, doc.internal.pageSize.width / 2, 15, { align: 'center' })
+  doc.text(fixArabic(title), pageWidth / 2, 15, { align: 'center' })
+
+  // Print date
   doc.setFontSize(10)
-  doc.text(`تاريخ الطباعة: ${new Date().toLocaleDateString('ar-SA')}`, doc.internal.pageSize.width - 20, 22, { align: 'right' })
+  const printDate = `${fixArabic('تاريخ الطباعة')}: ${new Date().toLocaleDateString('ar-SA')}`
+  doc.text(printDate, pageWidth - 20, 22, { align: 'right' })
+
+  // Fix Arabic in headers and rows
+  const fixedHeaders = headers.map(h => fixArabic(h))
+  const fixedRows = rows.map(row => fixArabicRow(row))
 
   autoTable(doc, {
-    head: [headers],
-    body: rows,
+    head: [fixedHeaders],
+    body: fixedRows,
     startY: 28,
-    styles: { fontSize: 9, cellPadding: 3, halign: 'center' },
-    headStyles: { fillColor: [232, 76, 30], textColor: 255, fontStyle: 'bold' },
+    // RTL column order — reverse columns so right-most is first
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      halign: 'right',
+      font: 'helvetica',
+    },
+    headStyles: {
+      fillColor: [232, 76, 30],
+      textColor: 255,
+      fontStyle: 'bold',
+      halign: 'right',
+    },
     alternateRowStyles: { fillColor: [245, 245, 245] },
+    // Reverse column order to match Arabic RTL reading direction
+    didParseCell: (data) => {
+      if (data.section === 'head' || data.section === 'body') {
+        data.cell.styles.halign = 'right'
+      }
+    },
   })
+
   doc.save(`${filename}.pdf`)
 }
 
