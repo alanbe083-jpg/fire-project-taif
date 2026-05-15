@@ -36,7 +36,9 @@ export function isExpired(dateStr?: string | null): boolean {
 
 export function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(dateStr).toLocaleDateString('ar-SA', {
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  })
 }
 
 // ─── Export to Excel ────────────────────────────────────────────────────
@@ -47,67 +49,124 @@ export function exportToExcel(data: any[], filename: string, sheetName = 'الب
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-// ─── Arabic Text Helper ─────────────────────────────────────────────────
-// Reverses Arabic text so jsPDF renders it correctly right-to-left
-function fixArabic(text: string): string {
-  if (!text || typeof text !== 'string') return text ?? ''
-  // Check if text contains Arabic characters
-  const hasArabic = /[\u0600-\u06FF]/.test(text)
-  if (!hasArabic) return text
-  // Reverse the string to fix RTL rendering in jsPDF
-  return text.split('').reverse().join('')
+// ─── Canvas Arabic Renderer ─────────────────────────────────────────────
+// jsPDF cannot render Arabic natively. This function renders Arabic text
+// onto an HTML canvas (which uses the browser's built-in Arabic shaping)
+// and returns it as a PNG data URL to embed in the PDF.
+function arabicToImage(
+  text: string,
+  opts: { fontSize?: number; bold?: boolean; color?: string; bgColor?: string } = {}
+): { dataUrl: string; widthPx: number; heightPx: number } {
+  const { fontSize = 10, bold = false, color = '#1a1a1a', bgColor = 'transparent' } = opts
+  const scale = 3 // retina scale for sharp text
+  const fontPx = fontSize * scale
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')!
+  const fontStr = `${bold ? 'bold ' : ''}${fontPx}px Arial, sans-serif`
+  ctx.font = fontStr
+  const measured = ctx.measureText(text).width
+  const widthPx = Math.ceil(measured) + 16
+  const heightPx = Math.ceil(fontPx * 1.4)
+  canvas.width = widthPx
+  canvas.height = heightPx
+  if (bgColor !== 'transparent') {
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, widthPx, heightPx)
+  }
+  ctx.font = fontStr
+  ctx.fillStyle = color
+  ctx.direction = 'rtl'
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, widthPx - 4, heightPx / 2)
+  return { dataUrl: canvas.toDataURL('image/png'), widthPx, heightPx }
 }
 
-function fixArabicRow(row: any[]): any[] {
-  return row.map(cell => {
-    if (typeof cell === 'string') return fixArabic(cell)
-    return cell
-  })
+// Convert canvas pixels to PDF mm units (1px = 0.264583mm at 96dpi, but we used scale=3)
+function pxToMm(px: number, scale = 3): number {
+  return (px / scale) * 0.264583
 }
 
 // ─── Export to PDF ──────────────────────────────────────────────────────
-export function exportToPDF(title: string, headers: string[], rows: any[][], filename: string) {
+export function exportToPDF(
+  title: string,
+  headers: string[],
+  rows: any[][],
+  filename: string
+) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-
   const pageWidth = doc.internal.pageSize.width
 
-  // Title (Arabic reversed for correct rendering)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.text(fixArabic(title), pageWidth / 2, 15, { align: 'center' })
+  // ── Title ──
+  const titleImg = arabicToImage(title, { fontSize: 16, bold: true, color: '#1a1a1a' })
+  const titleMmW = Math.min(pxToMm(titleImg.widthPx), pageWidth - 20)
+  const titleMmH = pxToMm(titleImg.heightPx)
+  doc.addImage(titleImg.dataUrl, 'PNG', (pageWidth - titleMmW) / 2, 6, titleMmW, titleMmH)
 
-  // Print date
-  doc.setFontSize(10)
-  const printDate = `${fixArabic('تاريخ الطباعة')}: ${new Date().toLocaleDateString('ar-SA')}`
-  doc.text(printDate, pageWidth - 20, 22, { align: 'right' })
+  // ── Print date ──
+  const dateStr = `تاريخ الطباعة: ${new Date().toLocaleDateString('ar-SA')}`
+  const dateImg = arabicToImage(dateStr, { fontSize: 9, color: '#555555' })
+  const dateMmW = Math.min(pxToMm(dateImg.widthPx), 70)
+  const dateMmH = pxToMm(dateImg.heightPx)
+  doc.addImage(dateImg.dataUrl, 'PNG', pageWidth - dateMmW - 5, 20, dateMmW, dateMmH)
 
-  // Fix Arabic in headers and rows
-  const fixedHeaders = headers.map(h => fixArabic(h))
-  const fixedRows = rows.map(row => fixArabicRow(row))
+  // ── Table: use placeholder spaces so autoTable draws cells/borders,
+  //    then we overdraw each cell with the Arabic canvas image ──
+  const blankHeaders = headers.map(() => ' ')
+  const blankRows = rows.map(r => r.map(() => ' '))
+
+  // Pre-render header images (white text on orange)
+  const headerImgs = headers.map(h =>
+    arabicToImage(h, { fontSize: 9, bold: true, color: '#ffffff' })
+  )
+  // Pre-render body cell images
+  const bodyImgs = rows.map(row =>
+    row.map(cell => {
+      const str = cell === null || cell === undefined ? '' : String(cell)
+      return arabicToImage(str, { fontSize: 9, color: '#1a1a1a' })
+    })
+  )
 
   autoTable(doc, {
-    head: [fixedHeaders],
-    body: fixedRows,
+    head: [blankHeaders],
+    body: blankRows,
     startY: 28,
-    // RTL column order — reverse columns so right-most is first
     styles: {
       fontSize: 9,
-      cellPadding: 3,
+      cellPadding: 2,
       halign: 'right',
-      font: 'helvetica',
+      minCellHeight: 9,
     },
     headStyles: {
       fillColor: [232, 76, 30],
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'right',
+      textColor: [255, 255, 255],
+      minCellHeight: 9,
     },
     alternateRowStyles: { fillColor: [245, 245, 245] },
-    // Reverse column order to match Arabic RTL reading direction
-    didParseCell: (data) => {
-      if (data.section === 'head' || data.section === 'body') {
-        data.cell.styles.halign = 'right'
+    didDrawCell: (data) => {
+      const { section, column, row, cell } = data
+      const col = column.index
+      const rowIdx = row.index
+
+      let img: { dataUrl: string; widthPx: number; heightPx: number }
+      if (section === 'head') {
+        if (col >= headerImgs.length) return
+        img = headerImgs[col]
+      } else {
+        if (rowIdx >= bodyImgs.length || col >= bodyImgs[rowIdx].length) return
+        img = bodyImgs[rowIdx][col]
       }
+
+      // Fit image inside cell, right-aligned with small padding
+      const pad = 1
+      const maxW = cell.width - pad * 2
+      const maxH = cell.height - pad * 2
+      const imgMmW = Math.min(pxToMm(img.widthPx), maxW)
+      const imgMmH = Math.min(pxToMm(img.heightPx), maxH)
+      // Right-align: start x = cell right edge - padding - image width
+      const x = cell.x + cell.width - pad - imgMmW
+      const y = cell.y + (cell.height - imgMmH) / 2
+      doc.addImage(img.dataUrl, 'PNG', x, y, imgMmW, imgMmH)
     },
   })
 
