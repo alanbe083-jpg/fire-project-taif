@@ -25,7 +25,7 @@ async function sendDocument(chatId: number, buffer: Buffer, filename: string, ca
   const form = new FormData()
   form.append('chat_id', String(chatId))
   form.append('caption', caption)
-  form.append('document', new Blob([buffer], {
+  form.append('document', new Blob([new Uint8Array(buffer)], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   }), filename)
   await fetch(`${API}/sendDocument`, { method: 'POST', body: form })
@@ -140,6 +140,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('Telegram webhook error:', err)
-    return NextResponse.json({ ok: true }) // Always return 200 to Telegram
+    return NextResponse.json({ ok: true })
   }
 }
