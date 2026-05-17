@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
+import path from 'path'
+import fs from 'fs'
 
 function getSupabase() {
   return createClient(
@@ -16,77 +18,122 @@ export function generateExcelBuffer(data: any[], sheetName: string): Buffer {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 }
 
-// ─── PDF Buffer (Arabic-safe using HTML) ─────────────────────────────────
+// ─── PDF Buffer using pdfmake with Arabic font ───────────────────────────
 export async function generatePDFBuffer(title: string, headers: string[], rows: any[][]): Promise<Buffer> {
+  const PdfPrinter = require('pdfmake')
+
+  // Load Arabic font from project
+  const fontPath = path.join(process.cwd(), 'src', 'fonts', 'Amiri-Regular.ttf')
+  const fontBuffer = fs.readFileSync(fontPath)
+  const fontBase64 = fontBuffer.toString('base64')
+
+  const fonts = {
+    Amiri: {
+      normal: Buffer.from(fontBase64, 'base64'),
+      bold: Buffer.from(fontBase64, 'base64'),
+      italics: Buffer.from(fontBase64, 'base64'),
+      bolditalics: Buffer.from(fontBase64, 'base64'),
+    }
+  }
+
+  const printer = new PdfPrinter(fonts)
+
+  // Reverse Arabic text for RTL rendering in pdfmake
+  function rtl(text: any): string {
+    const str = text === null || text === undefined ? '' : String(text)
+    if (!/[\u0600-\u06FF]/.test(str)) return str
+    // Reverse words (not characters) for better RTL rendering
+    return str.split(' ').reverse().join(' ')
+  }
+
   const date = new Date().toLocaleDateString('ar-SA')
 
-  const tableHeaders = headers.map(h => `<th>${h}</th>`).join('')
-  const tableRows = rows.map(row =>
-    `<tr>${row.map(cell => `<td>${cell ?? ''}</td>`).join('')}</tr>`
-  ).join('')
+  // Build table body
+  const tableBody: any[][] = []
 
-  const html = `
-    <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          direction: rtl;
-          padding: 20px;
-          font-size: 11px;
-        }
-        h2 {
-          text-align: center;
-          color: #e84c1e;
-          margin-bottom: 5px;
-        }
-        .date {
-          text-align: left;
-          color: #666;
-          margin-bottom: 15px;
-          font-size: 10px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        th {
-          background: #e84c1e;
-          color: white;
-          padding: 6px 8px;
-          border: 1px solid #ccc;
-          text-align: right;
-          font-size: 10px;
-        }
-        td {
-          padding: 5px 8px;
-          border: 1px solid #ddd;
-          text-align: right;
-          font-size: 10px;
-        }
-        tr:nth-child(even) {
-          background: #f5f5f5;
-        }
-      </style>
-    </head>
-    <body>
-      <h2>${title}</h2>
-      <div class="date">تاريخ الطباعة: ${date}</div>
-      <table>
-        <thead><tr>${tableHeaders}</tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </body>
-    </html>
-  `
+  // Header row
+  tableBody.push(
+    headers.map(h => ({
+      text: rtl(h),
+      style: 'tableHeader',
+      alignment: 'right',
+    }))
+  )
 
-  const htmlPdf = require('html-pdf-node')
-  const file = { content: html }
-  const options = { format: 'A4', landscape: true }
-  const pdfBuffer = await htmlPdf.generatePdf(file, options)
-  return pdfBuffer
+  // Data rows
+  rows.forEach(row => {
+    tableBody.push(
+      row.map(cell => ({
+        text: rtl(cell),
+        alignment: 'right',
+        fontSize: 9,
+      }))
+    )
+  })
+
+  const docDefinition: any = {
+    pageOrientation: 'landscape',
+    pageSize: 'A4',
+    pageMargins: [20, 40, 20, 40],
+    defaultStyle: {
+      font: 'Amiri',
+      fontSize: 9,
+    },
+    content: [
+      {
+        text: rtl(title),
+        style: 'title',
+        alignment: 'center',
+        margin: [0, 0, 0, 5],
+      },
+      {
+        text: `${rtl('تاريخ الطباعة')}: ${date}`,
+        alignment: 'right',
+        fontSize: 9,
+        color: '#666666',
+        margin: [0, 0, 0, 10],
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: headers.map(() => '*'),
+          body: tableBody,
+        },
+        layout: {
+          fillColor: (rowIndex: number) => {
+            if (rowIndex === 0) return '#e84c1e'
+            return rowIndex % 2 === 0 ? '#f5f5f5' : null
+          },
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => '#dddddd',
+          vLineColor: () => '#dddddd',
+        },
+      },
+    ],
+    styles: {
+      title: {
+        fontSize: 16,
+        bold: true,
+        color: '#e84c1e',
+      },
+      tableHeader: {
+        bold: true,
+        fontSize: 9,
+        color: '#ffffff',
+        fillColor: '#e84c1e',
+      },
+    },
+  }
+
+  return new Promise((resolve, reject) => {
+    const pdfDoc = printer.createPdfKitDocument(docDefinition)
+    const chunks: Buffer[] = []
+    pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk))
+    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)))
+    pdfDoc.on('error', reject)
+    pdfDoc.end()
+  })
 }
 
 // ─── Data Fetchers ────────────────────────────────────────────────────────
