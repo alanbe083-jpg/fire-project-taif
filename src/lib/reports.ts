@@ -8,6 +8,7 @@ function getSupabase() {
   )
 }
 
+// ─── Excel Buffer ────────────────────────────────────────────────────────
 export function generateExcelBuffer(data: any[], sheetName: string): Buffer {
   const ws = XLSX.utils.json_to_sheet(data)
   const wb = XLSX.utils.book_new()
@@ -15,62 +16,80 @@ export function generateExcelBuffer(data: any[], sheetName: string): Buffer {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 }
 
-// ─── Server-side PDF generator (no browser needed) ───────────────────────
-export function generatePDFBuffer(title: string, headers: string[], rows: any[][]): Buffer {
-  const lines: string[] = []
+// ─── PDF Buffer (Arabic-safe using HTML) ─────────────────────────────────
+export async function generatePDFBuffer(title: string, headers: string[], rows: any[][]): Promise<Buffer> {
   const date = new Date().toLocaleDateString('ar-SA')
 
-  lines.push(`%PDF-1.4`)
-  // We use a simple approach: generate an HTML-like text report as PDF
-  // Using pdfkit would require installation, so we build a clean text-based PDF
+  const tableHeaders = headers.map(h => `<th>${h}</th>`).join('')
+  const tableRows = rows.map(row =>
+    `<tr>${row.map(cell => `<td>${cell ?? ''}</td>`).join('')}</tr>`
+  ).join('')
 
-  // Actually build with manual PDF structure
-  const content: string[] = []
-  content.push(title)
-  content.push(`Date: ${date}`)
-  content.push('─'.repeat(80))
-  content.push(headers.join(' | '))
-  content.push('─'.repeat(80))
-  rows.forEach(row => {
-    content.push(row.map(c => String(c ?? '')).join(' | '))
-  })
-  content.push('─'.repeat(80))
+  const html = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          direction: rtl;
+          padding: 20px;
+          font-size: 11px;
+        }
+        h2 {
+          text-align: center;
+          color: #e84c1e;
+          margin-bottom: 5px;
+        }
+        .date {
+          text-align: left;
+          color: #666;
+          margin-bottom: 15px;
+          font-size: 10px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th {
+          background: #e84c1e;
+          color: white;
+          padding: 6px 8px;
+          border: 1px solid #ccc;
+          text-align: right;
+          font-size: 10px;
+        }
+        td {
+          padding: 5px 8px;
+          border: 1px solid #ddd;
+          text-align: right;
+          font-size: 10px;
+        }
+        tr:nth-child(even) {
+          background: #f5f5f5;
+        }
+      </style>
+    </head>
+    <body>
+      <h2>${title}</h2>
+      <div class="date">تاريخ الطباعة: ${date}</div>
+      <table>
+        <thead><tr>${tableHeaders}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </body>
+    </html>
+  `
 
-  const text = content.join('\n')
-  const encoded = Buffer.from(text, 'utf-8')
-
-  // Build minimal valid PDF with embedded UTF-8 text
-  const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`
-  const obj2 = `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`
-  const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n`
-
-  // Build text stream
-  const lines2: string[] = []
-  lines2.push('BT')
-  lines2.push('/F1 10 Tf')
-  lines2.push('50 550 Td')
-  lines2.push('14 TL')
-
-  content.forEach(line => {
-    const safe = line.replace(/[()\\]/g, c => '\\' + c)
-    lines2.push(`(${safe}) Tj T*`)
-  })
-  lines2.push('ET')
-
-  const stream = lines2.join('\n')
-  const obj4 = `4 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`
-  const obj5 = `5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n`
-
-  const body = obj1 + obj2 + obj3 + obj4 + obj5
-  const xrefOffset = body.length + '%PDF-1.4\n'.length
-
-  const xref = `xref\n0 6\n0000000000 65535 f \n${String('%PDF-1.4\n'.length).padStart(10, '0')} 00000 n \n${String('%PDF-1.4\n'.length + obj1.length).padStart(10, '0')} 00000 n \n${String('%PDF-1.4\n'.length + obj1.length + obj2.length).padStart(10, '0')} 00000 n \n${String('%PDF-1.4\n'.length + obj1.length + obj2.length + obj3.length).padStart(10, '0')} 00000 n \n${String('%PDF-1.4\n'.length + obj1.length + obj2.length + obj3.length + obj4.length).padStart(10, '0')} 00000 n \n`
-  const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
-
-  return Buffer.from('%PDF-1.4\n' + body + xref + trailer, 'latin1')
+  const htmlPdf = require('html-pdf-node')
+  const file = { content: html }
+  const options = { format: 'A4', landscape: true }
+  const pdfBuffer = await htmlPdf.generatePdf(file, options)
+  return pdfBuffer
 }
 
-// ─── Fetch data helpers ───────────────────────────────────────────────────
+// ─── Data Fetchers ────────────────────────────────────────────────────────
 async function fetchWorks() {
   const { data } = await getSupabase().from('works')
     .select('item_no, description, location, quantity, unit, progress, status, start_date, end_date, responsible, notes')
@@ -206,42 +225,42 @@ export const REPORTS: Record<string, {
   works: {
     label: 'تقرير الأعمال', emoji: '🔨',
     fetchExcel: async () => { const d = await fetchWorks(); return { buffer: generateExcelBuffer(d.objects, 'الأعمال'), filename: `تقرير-الأعمال-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchWorks(); return { buffer: generatePDFBuffer('تقرير الأعمال', d.headers, d.rows), filename: `تقرير-الأعمال-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchWorks(); return { buffer: await generatePDFBuffer('تقرير الأعمال', d.headers, d.rows), filename: `تقرير-الأعمال-${today()}.pdf` } },
   },
   workers: {
     label: 'تقرير العمال', emoji: '👷',
     fetchExcel: async () => { const d = await fetchWorkers(); return { buffer: generateExcelBuffer(d.objects, 'العمال'), filename: `تقرير-العمال-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchWorkers(); return { buffer: generatePDFBuffer('تقرير العمال', d.headers, d.rows), filename: `تقرير-العمال-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchWorkers(); return { buffer: await generatePDFBuffer('تقرير العمال', d.headers, d.rows), filename: `تقرير-العمال-${today()}.pdf` } },
   },
   vehicles: {
     label: 'تقرير المركبات', emoji: '🚗',
     fetchExcel: async () => { const d = await fetchVehicles(); return { buffer: generateExcelBuffer(d.objects, 'المركبات'), filename: `تقرير-المركبات-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchVehicles(); return { buffer: generatePDFBuffer('تقرير المركبات', d.headers, d.rows), filename: `تقرير-المركبات-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchVehicles(); return { buffer: await generatePDFBuffer('تقرير المركبات', d.headers, d.rows), filename: `تقرير-المركبات-${today()}.pdf` } },
   },
   tools: {
     label: 'تقرير العدة والمعدات', emoji: '🔧',
     fetchExcel: async () => { const d = await fetchTools(); return { buffer: generateExcelBuffer(d.objects, 'العدة'), filename: `تقرير-العدة-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchTools(); return { buffer: generatePDFBuffer('تقرير العدة والمعدات', d.headers, d.rows), filename: `تقرير-العدة-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchTools(); return { buffer: await generatePDFBuffer('تقرير العدة والمعدات', d.headers, d.rows), filename: `تقرير-العدة-${today()}.pdf` } },
   },
   inventory: {
     label: 'تقرير المخزون', emoji: '📦',
     fetchExcel: async () => { const d = await fetchInventory(); return { buffer: generateExcelBuffer(d.objects, 'المخزون'), filename: `تقرير-المخزون-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchInventory(); return { buffer: generatePDFBuffer('تقرير المخزون', d.headers, d.rows), filename: `تقرير-المخزون-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchInventory(); return { buffer: await generatePDFBuffer('تقرير المخزون', d.headers, d.rows), filename: `تقرير-المخزون-${today()}.pdf` } },
   },
   approvals: {
     label: 'تقرير الاعتمادات', emoji: '✅',
     fetchExcel: async () => { const d = await fetchApprovals(); return { buffer: generateExcelBuffer(d.objects, 'الاعتمادات'), filename: `تقرير-الاعتمادات-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchApprovals(); return { buffer: generatePDFBuffer('تقرير الاعتمادات', d.headers, d.rows), filename: `تقرير-الاعتمادات-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchApprovals(); return { buffer: await generatePDFBuffer('تقرير الاعتمادات', d.headers, d.rows), filename: `تقرير-الاعتمادات-${today()}.pdf` } },
   },
   custody: {
     label: 'تقرير العهدة', emoji: '🗃️',
     fetchExcel: async () => { const d = await fetchCustody(); return { buffer: generateExcelBuffer(d.objects, 'العهدة'), filename: `تقرير-العهدة-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchCustody(); return { buffer: generatePDFBuffer('تقرير العهدة', d.headers, d.rows), filename: `تقرير-العهدة-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchCustody(); return { buffer: await generatePDFBuffer('تقرير العهدة', d.headers, d.rows), filename: `تقرير-العهدة-${today()}.pdf` } },
   },
   documents: {
     label: 'تقرير المستندات', emoji: '📄',
     fetchExcel: async () => { const d = await fetchDocuments(); return { buffer: generateExcelBuffer(d.objects, 'المستندات'), filename: `تقرير-المستندات-${today()}.xlsx` } },
-    fetchPDF: async () => { const d = await fetchDocuments(); return { buffer: generatePDFBuffer('تقرير المستندات', d.headers, d.rows), filename: `تقرير-المستندات-${today()}.pdf` } },
+    fetchPDF: async () => { const d = await fetchDocuments(); return { buffer: await generatePDFBuffer('تقرير المستندات', d.headers, d.rows), filename: `تقرير-المستندات-${today()}.pdf` } },
   },
 }
 
