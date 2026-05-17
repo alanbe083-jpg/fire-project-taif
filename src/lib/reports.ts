@@ -23,7 +23,7 @@ export async function generatePDFBuffer(title: string, headers: string[], rows: 
   const PdfPrinter = require('pdfmake')
 
   // Load Arabic font from project
-  const fontPath = path.join(process.cwd(), 'src', 'fonts', 'Amiri-Regular.ttf')
+  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Amiri-Regular.ttf')
   const fontBuffer = fs.readFileSync(fontPath)
   const fontBase64 = fontBuffer.toString('base64')
 
