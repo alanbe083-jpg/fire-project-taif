@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "pdfkit": "^0.15.0",
+    "pdfmake": "^0.2.9",
     "@types/pdfkit": "^0.13.4",
     "html-pdf-node": "^1.0.8",
     "@supabase/supabase-js": "^2.39.0",
