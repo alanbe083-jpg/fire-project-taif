@@ -43,9 +43,7 @@ export async function generatePDFBuffer(
 ): Promise<Buffer> {
   const PDFDocument = (await import('pdfkit')).default
 
- const fontPath = path.resolve('./public/fonts/Amiri-Regular.ttf')doc.registerFont('Amiri', fontPath)
-
-
+  // Create the PDF document first
   const PAGE_W = 841.89
   const PAGE_H = 595.28
   const MARGIN = 28
@@ -62,13 +60,20 @@ export async function generatePDFBuffer(
     info: { Title: title },
   })
 
+  // Register and set Amiri as the default font
+  const fontPath = path.resolve('./public/fonts/Amiri-Regular.ttf')
   doc.registerFont('Amiri', fontPath)
+  doc.font('Amiri')   // <— this line forces Amiri as default, avoids Helvetica
 
   function rtl(text: any): string {
     const str = text === null || text === undefined ? '' : String(text)
     if (!/[\u0600-\u06FF]/.test(str)) return str
     return str.split(' ').reverse().join(' ')
   }
+
+  // … rest of your drawing code …
+}
+
 
   function drawCell(
     text: string, x: number, y: number, w: number, h: number,
