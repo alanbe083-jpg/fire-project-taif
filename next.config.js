@@ -16,7 +16,7 @@ if (fs.existsSync(trieDir)) {
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['your-project.supabase.co'],
+    domains: ['https://dilnokyxyiqkgqluqoju.supabase.co'],
   },
 }
 
