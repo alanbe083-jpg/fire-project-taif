@@ -43,7 +43,8 @@ export async function generatePDFBuffer(
 ): Promise<Buffer> {
   const PDFDocument = (await import('pdfkit')).default
 
-  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Amiri-Regular.ttf')
+ const fontPath = path.resolve('./public/fonts/Amiri-Regular.ttf')doc.registerFont('Amiri', fontPath)
+
 
   const PAGE_W = 841.89
   const PAGE_H = 595.28
