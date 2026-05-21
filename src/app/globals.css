@@ -114,3 +114,89 @@
   body { background: white !important; color: black !important; }
   .card { border: 1px solid #ddd !important; background: white !important; }
 }
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    direction: rtl !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  aside,
+  nav,
+  header,
+  .sidebar,
+  .no-print,
+  button,
+  input,
+  select,
+  textarea,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  main,
+  body > div,
+  .content,
+  .page,
+  .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    direction: rtl !important;
+    font-size: 10px !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #333333 !important;
+    padding: 5px !important;
+    text-align: center !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    white-space: normal !important;
+  }
+
+  th {
+    font-weight: 700 !important;
+    background: #eeeeee !important;
+  }
+
+  .card,
+  .table-row,
+  .table-header {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #333333 !important;
+    box-shadow: none !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+}
