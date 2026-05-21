@@ -114,8 +114,7 @@ export default function ReportsPage() {
       { key: 'status', label: 'الحالة' },
       { key: 'revision_no', label: 'المراجعة' },
     ],
-
- tools: [
+tools: [
   { key: 'tool_name', label: 'اسم العدة' },
   { key: 'tool_type', label: 'نوع العدة' },
   { key: 'total_qty', label: 'الإجمالي' },
