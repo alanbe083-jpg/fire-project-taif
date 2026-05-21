@@ -177,11 +177,14 @@ tools: [
   )
 }
 
-    exportToPDF(
-      `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
-      pdfCols.map((c) => c.label),
-      data.map((row) => pdfCols.map((c) => getCellValue(row, c.key))),
-      currentReport.label
+    function doExportPDF() {
+  exportToPDF(
+    `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
+    cols.map((c) => c.label),
+    data.map((row) => cols.map((c) => getCellValue(row, c.key))),
+    currentReport.label
+  )
+}
     )
   }
 
