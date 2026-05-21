@@ -168,7 +168,14 @@ export default function ReportsPage() {
       لذلك نعكس الأعمدة هنا فقط للـ PDF، حتى تظهر في الملف من اليمين لليسار.
       العرض داخل الموقع يبقى طبيعي RTL.
     */
-    const pdfCols = [...cols].reverse()
+   function doExportPDF() {
+  exportToPDF(
+    `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
+    cols.map((c) => c.label),
+    data.map((row) => cols.map((c) => getCellValue(row, c.key))),
+    currentReport.label
+  )
+}
 
     exportToPDF(
       `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
