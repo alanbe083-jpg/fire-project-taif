@@ -114,16 +114,16 @@ export default function ReportsPage() {
       { key: 'status', label: 'الحالة' },
       { key: 'revision_no', label: 'المراجعة' },
     ],
-tools: [
-  { key: 'tool_name', label: 'اسم العدة' },
-  { key: 'tool_type', label: 'نوع العدة' },
-  { key: 'total_qty', label: 'الإجمالي' },
-  { key: 'used_qty', label: 'المستخدم' },
-  { key: 'available_qty', label: 'المتاح' },
-  { key: 'status', label: 'الحالة' },
-  { key: 'storage_location', label: 'موقع التخزين' },
-  { key: 'received_by', label: 'المستلم' },
-],
+
+    tools: [
+      { key: 'item_no', label: 'رقم العدة' },
+      { key: 'description', label: 'اسم العدة' },
+      { key: 'location', label: 'الموقع' },
+      { key: 'quantity', label: 'الإجمالي' },
+      { key: 'used_qty', label: 'المستخدم' },
+      { key: 'available_qty', label: 'المتاح' },
+      { key: 'status', label: 'الحالة' },
+    ],
 
     custody: [
       { key: 'custody_no', label: 'رقم العهدة' },
@@ -168,23 +168,15 @@ tools: [
       لذلك نعكس الأعمدة هنا فقط للـ PDF، حتى تظهر في الملف من اليمين لليسار.
       العرض داخل الموقع يبقى طبيعي RTL.
     */
-   function doExportPDF() {
-  exportToPDF(
-    `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
-    cols.map((c) => c.label),
-    data.map((row) => cols.map((c) => getCellValue(row, c.key))),
-    currentReport.label
-  )
-}
+    const pdfCols = [...cols].reverse()
 
-  function doExportPDF() {
-  exportToPDF(
-    `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
-    cols.map((c) => c.label),
-    data.map((row) => cols.map((c) => getCellValue(row, c.key))),
-    currentReport.label
-  )
-}
+    exportToPDF(
+      `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
+      pdfCols.map((c) => c.label),
+      data.map((row) => pdfCols.map((c) => getCellValue(row, c.key))),
+      currentReport.label
+    )
+  }
 
   return (
     <div dir="rtl" className="space-y-5 animate-fade-in print-page">
