@@ -177,7 +177,7 @@ tools: [
   )
 }
 
-    function doExportPDF() {
+  function doExportPDF() {
   exportToPDF(
     `${currentReport.label} — مشروع مكافحة الحريق — الطائف`,
     cols.map((c) => c.label),
@@ -185,8 +185,6 @@ tools: [
     currentReport.label
   )
 }
-    )
-  }
 
   return (
     <div dir="rtl" className="space-y-5 animate-fade-in print-page">
