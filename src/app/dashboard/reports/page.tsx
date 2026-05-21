@@ -115,15 +115,17 @@ export default function ReportsPage() {
       { key: 'revision_no', label: 'المراجعة' },
     ],
 
-    tools: [
-      { key: 'item_no', label: 'رقم العدة' },
-      { key: 'description', label: 'اسم العدة' },
-      { key: 'location', label: 'الموقع' },
-      { key: 'quantity', label: 'الإجمالي' },
-      { key: 'used_qty', label: 'المستخدم' },
-      { key: 'available_qty', label: 'المتاح' },
-      { key: 'status', label: 'الحالة' },
-    ],
+   tools: [
+  { key: 'tool_name', label: 'اسم العدة' },
+  { key: 'tool_type', label: 'النوع' },
+  { key: 'total_qty', label: 'الإجمالي' },
+  { key: 'available_qty', label: 'المتاح' },
+  { key: 'used_qty', label: 'المستخدم' },
+  { key: 'status', label: 'الحالة' },
+  { key: 'storage_location', label: 'موقع التخزين' },
+  { key: 'received_by', label: 'تسلم بواسطة' },
+  { key: 'handover_date', label: 'تاريخ التسليم' },
+],
 
     custody: [
       { key: 'custody_no', label: 'رقم العهدة' },
