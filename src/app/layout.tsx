@@ -3,8 +3,10 @@ import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 
 export const metadata: Metadata = {
-  title: 'نظام متابعة مشروع مكافحة الحريق — الطائف',
+  title: 'نظام متابعة مشروع مكافحة الحريق - الطائف',
   description: 'Fire Protection Project Management System - Taif',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#020617',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,3 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
+export const metadata = {
+  title: "نظام متابعة مشروع مكافحة الحريق",
+  icons: {
+    apple: "/icon-512.png",
+  },
+};
